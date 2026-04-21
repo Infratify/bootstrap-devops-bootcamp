@@ -4,7 +4,7 @@ Bootstrap Windows for DevOps Bootcamp. One double-click. Auto-elevates.
 
 ## Usage
 
-1. Download repo (or clone).
+1. Download ZIP & extract in your desktop.
 2. Double-click `script.bat`. Accept UAC prompt.
 3. Wait. Reboot if prompted. Re-run script.
 4. Pick `Y` to install Ubuntu 24.04 when asked.
