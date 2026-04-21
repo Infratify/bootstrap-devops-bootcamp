@@ -50,16 +50,59 @@ $summary = [System.Collections.ArrayList]::new()
 function Add-Result {
     param(
         [string]$Component,
-        [string]$Status
+        [string]$Status,
+        [string]$Reason
     )
     $summary.Add([PSCustomObject]@{
         Component = $Component
         Status    = $Status
+        Reason    = $Reason
     }) | Out-Null
-    Write-Log "$Component : $Status"
+    if ($Reason) {
+        Write-Log "$Component : $Status ($Reason)"
+    } else {
+        Write-Log "$Component : $Status"
+    }
+}
+
+# =====================================================================
+# Windows version / edition detection
+# =====================================================================
+$winInfo = $null
+try {
+    $reg = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -ErrorAction Stop
+    $build = [int]$reg.CurrentBuildNumber
+    $ubr = 0
+    if ($reg.PSObject.Properties['UBR']) { $ubr = [int]$reg.UBR }
+    $editionId = "$($reg.EditionID)"
+    $productName = "$($reg.ProductName)"
+    $displayVersion = if ($reg.PSObject.Properties['DisplayVersion']) { "$($reg.DisplayVersion)" } else { "$($reg.ReleaseId)" }
+
+    # Win 11 identifies as build >= 22000 even though ProductName may still say "Windows 10"
+    $osFamily = if ($build -ge 22000) { "Windows 11" } else { "Windows 10" }
+    $isHome = $editionId -match "Core|Home"
+    $isServer = $editionId -match "Server"
+
+    $winInfo = [PSCustomObject]@{
+        Family         = $osFamily
+        ProductName    = $productName
+        EditionID      = $editionId
+        DisplayVersion = $displayVersion
+        Build          = $build
+        UBR            = $ubr
+        IsHome         = $isHome
+        IsServer       = $isServer
+    }
+
+    Write-Log "Detected: $osFamily $editionId ($displayVersion) build $build.$ubr"
+} catch {
+    Write-Log "Windows version detection failed: $_"
 }
 
 Write-Host "=== Bootcamp Environment Bootstrap ===" -ForegroundColor Cyan
+if ($winInfo) {
+    Write-Host "OS:  $($winInfo.Family) $($winInfo.EditionID) $($winInfo.DisplayVersion) (build $($winInfo.Build).$($winInfo.UBR))" -ForegroundColor DarkGray
+}
 Write-Host "Log: $logFile`n" -ForegroundColor DarkGray
 
 $rebootRequired = $false
@@ -94,20 +137,43 @@ if (Get-Command choco -ErrorAction SilentlyContinue) {
 # =====================================================================
 # Windows Features
 # =====================================================================
+# MinBuild / RequiresPro gate skipped features with an explicit reason instead of silent "skipped".
+# WSL2 + VM Platform need 19041 (Win10 2004). Hyper-V + Containers require Pro/Enterprise/Education.
 $features = @(
-    @{ Name = "Microsoft-Windows-Subsystem-Linux"; Display = "WSL Feature" }
-    @{ Name = "VirtualMachinePlatform";            Display = "Virtual Machine Platform" }
-    @{ Name = "Microsoft-Hyper-V-All";             Display = "Hyper-V" }
-    @{ Name = "Containers";                        Display = "Containers" }
+    @{ Name = "Microsoft-Windows-Subsystem-Linux"; Display = "WSL Feature";              MinBuild = 19041; RequiresPro = $false }
+    @{ Name = "VirtualMachinePlatform";            Display = "Virtual Machine Platform"; MinBuild = 19041; RequiresPro = $false }
+    @{ Name = "Microsoft-Hyper-V-All";             Display = "Hyper-V";                  MinBuild = 0;     RequiresPro = $true  }
+    @{ Name = "Containers";                        Display = "Containers";               MinBuild = 0;     RequiresPro = $true  }
 )
+
+function Test-FeatureSupported {
+    param($Feature, $WinInfo)
+    if (-not $WinInfo) { return @{ Supported = $true; Reason = "" } }
+    if ($Feature.RequiresPro -and $WinInfo.IsHome) {
+        return @{ Supported = $false; Reason = "requires Pro/Enterprise/Education (detected $($WinInfo.EditionID))" }
+    }
+    if ($Feature.MinBuild -gt 0 -and $WinInfo.Build -lt $Feature.MinBuild) {
+        return @{ Supported = $false; Reason = "requires build $($Feature.MinBuild)+ (detected $($WinInfo.Build))" }
+    }
+    return @{ Supported = $true; Reason = "" }
+}
 
 foreach ($feature in $features) {
     Write-Host "Checking $($feature.Display)..." -NoNewline
+
+    $support = Test-FeatureSupported -Feature $feature -WinInfo $winInfo
+    if (-not $support.Supported) {
+        Add-Result $feature.Display "Not Supported" $support.Reason
+        Write-Host " not supported ($($support.Reason))." -ForegroundColor DarkYellow
+        continue
+    }
+
     try {
         $state = Get-WindowsOptionalFeature -Online -FeatureName $feature.Name -ErrorAction SilentlyContinue
         if (-not $state) {
-            Add-Result $feature.Display "Not Ready"
-            Write-Host " skipped." -ForegroundColor DarkYellow
+            $reason = "feature not present in DISM catalog for this edition"
+            Add-Result $feature.Display "Not Ready" $reason
+            Write-Host " unavailable ($reason)." -ForegroundColor DarkYellow
         } elseif ($state.State -eq "Enabled") {
             Add-Result $feature.Display "Ready"
             Write-Host " done." -ForegroundColor Green
@@ -119,7 +185,7 @@ foreach ($feature in $features) {
         }
     } catch {
         Write-Log "Feature enable error ($($feature.Name)): $_"
-        Add-Result $feature.Display "Not Ready"
+        Add-Result $feature.Display "Not Ready" "$_"
         Write-Host " failed." -ForegroundColor Red
     }
 }
@@ -271,33 +337,41 @@ function Write-Table {
     $LJ = [char]0x251C; $RJ = [char]0x2524  # left-junction, right-junction
     $CJ = [char]0x253C                       # cross-junction
 
-    [int]$w1 = ($Data | ForEach-Object { $_.Component.Length } | Measure-Object -Maximum).Maximum
-    [int]$w2 = ($Data | ForEach-Object { $_.Status.Length }    | Measure-Object -Maximum).Maximum
+    [int]$w1 = ($Data | ForEach-Object { $_.Component.Length }        | Measure-Object -Maximum).Maximum
+    [int]$w2 = ($Data | ForEach-Object { $_.Status.Length }           | Measure-Object -Maximum).Maximum
+    [int]$w3 = ($Data | ForEach-Object { ("$($_.Reason)").Length }    | Measure-Object -Maximum).Maximum
     if ($w1 -lt 9)  { $w1 = 9 }
-    if ($w2 -lt 6)  { $w2 = 6 }
+    if ($w2 -lt 13) { $w2 = 13 }
+    if ($w3 -lt 6)  { $w3 = 6 }
 
-    $top    = "$TL$($H * ($w1 + 2))$TJ$($H * ($w2 + 2))$TR"
-    $mid    = "$LJ$($H * ($w1 + 2))$CJ$($H * ($w2 + 2))$RJ"
-    $bottom = "$BL$($H * ($w1 + 2))$BJ$($H * ($w2 + 2))$BR"
+    $top    = "$TL$($H * ($w1 + 2))$TJ$($H * ($w2 + 2))$TJ$($H * ($w3 + 2))$TR"
+    $mid    = "$LJ$($H * ($w1 + 2))$CJ$($H * ($w2 + 2))$CJ$($H * ($w3 + 2))$RJ"
+    $bottom = "$BL$($H * ($w1 + 2))$BJ$($H * ($w2 + 2))$BJ$($H * ($w3 + 2))$BR"
 
     Write-Host $top -ForegroundColor DarkGray
     Write-Host "$V " -NoNewline -ForegroundColor DarkGray
     Write-Host "Component".PadRight($w1) -NoNewline -ForegroundColor White
     Write-Host " $V " -NoNewline -ForegroundColor DarkGray
     Write-Host "Status".PadRight($w2) -NoNewline -ForegroundColor White
+    Write-Host " $V " -NoNewline -ForegroundColor DarkGray
+    Write-Host "Reason".PadRight($w3) -NoNewline -ForegroundColor White
     Write-Host " $V" -ForegroundColor DarkGray
     Write-Host $mid -ForegroundColor DarkGray
 
     foreach ($row in $Data) {
         $color = switch ($row.Status) {
-            "Ready"     { "Green" }
-            "Not Ready" { "Red" }
-            default     { "Yellow" }
+            "Ready"         { "Green" }
+            "Not Ready"     { "Red" }
+            "Not Supported" { "DarkYellow" }
+            default         { "Yellow" }
         }
+        $reasonText = "$($row.Reason)"
         Write-Host "$V " -NoNewline -ForegroundColor DarkGray
         Write-Host $row.Component.PadRight($w1) -NoNewline
         Write-Host " $V " -NoNewline -ForegroundColor DarkGray
         Write-Host $row.Status.PadRight($w2) -NoNewline -ForegroundColor $color
+        Write-Host " $V " -NoNewline -ForegroundColor DarkGray
+        Write-Host $reasonText.PadRight($w3) -NoNewline -ForegroundColor DarkGray
         Write-Host " $V" -ForegroundColor DarkGray
     }
 
@@ -309,6 +383,14 @@ Write-Host "=== Summary ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Table $summary
 Write-Host ""
+
+$unsupported = $summary | Where-Object { $_.Status -eq "Not Supported" }
+if ($unsupported) {
+    Write-Host "Note: " -NoNewline -ForegroundColor Cyan
+    Write-Host "$(($unsupported | ForEach-Object { $_.Component }) -join ', ') unavailable on this Windows edition." -ForegroundColor White
+    Write-Host "      WSL + Docker Desktop alone are sufficient for the bootcamp." -ForegroundColor DarkGray
+    Write-Host ""
+}
 
 if ($rebootRequired) {
     Write-Host "** A REBOOT IS REQUIRED to finish enabling Windows features. **" -ForegroundColor Red

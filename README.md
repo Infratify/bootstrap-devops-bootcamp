@@ -20,6 +20,8 @@ Log written to `script.log` next to script.
 
 Idempotent. Skips anything already present.
 
+> **Note:** Hyper-V and Containers require Windows Pro/Enterprise/Education and will show `Not Supported` on Home editions. WSL + Docker Desktop alone are sufficient for the bootcamp.
+
 ## Output
 
 ![Bootstrap run](screenshot.png)
