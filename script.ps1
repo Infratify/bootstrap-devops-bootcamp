@@ -135,6 +135,62 @@ if (Get-Command choco -ErrorAction SilentlyContinue) {
 }
 
 # =====================================================================
+# Applications
+# =====================================================================
+function Test-Git {
+    return [bool](Get-Command git -ErrorAction SilentlyContinue)
+}
+
+function Test-WindowsTerminal {
+    return [bool](Get-AppxPackage -Name "Microsoft.WindowsTerminal" -ErrorAction SilentlyContinue)
+}
+
+function Test-VSCode {
+    return [bool](
+        (Get-Command code -ErrorAction SilentlyContinue) -or
+        (Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\Code.exe") -or
+        (Test-Path "$env:ProgramFiles\Microsoft VS Code\Code.exe")
+    )
+}
+
+function Test-DockerDesktop {
+    return [bool](
+        (Get-Command docker -ErrorAction SilentlyContinue) -or
+        (Test-Path "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe")
+    )
+}
+
+$packages = @(
+    @{ Name = "git";                        Display = "Git";              Check = { Test-Git } }
+    @{ Name = "microsoft-windows-terminal"; Display = "Windows Terminal"; Check = { Test-WindowsTerminal } }
+    @{ Name = "vscode";                     Display = "VS Code";         Check = { Test-VSCode } }
+    @{ Name = "docker-desktop";             Display = "Docker Desktop";  Check = { Test-DockerDesktop } }
+)
+
+foreach ($pkg in $packages) {
+    Write-Host "Checking $($pkg.Display)..." -NoNewline
+    if (& $pkg.Check) {
+        Add-Result $pkg.Display "Ready"
+        Write-Host " done." -ForegroundColor Green
+    } else {
+        try {
+            Write-Host " installing..." -ForegroundColor Yellow
+            Invoke-LoggedCommand "choco install $($pkg.Name) -y"
+            Refresh-Path
+
+            if ($LASTEXITCODE -ne 0) {
+                Add-Result $pkg.Display "Not Ready"
+            } else {
+                Add-Result $pkg.Display "Ready"
+            }
+        } catch {
+            Write-Log "Install error ($($pkg.Name)): $_"
+            Add-Result $pkg.Display "Not Ready"
+        }
+    }
+}
+
+# =====================================================================
 # Windows Features
 # =====================================================================
 # MinBuild / RequiresPro gate skipped features with an explicit reason instead of silent "skipped".
@@ -263,62 +319,6 @@ if ($wslReady) {
             }
         } else {
             Add-Result "Ubuntu 24.04 LTS" "Not Ready"
-        }
-    }
-}
-
-# =====================================================================
-# Applications
-# =====================================================================
-function Test-Git {
-    return [bool](Get-Command git -ErrorAction SilentlyContinue)
-}
-
-function Test-WindowsTerminal {
-    return [bool](Get-AppxPackage -Name "Microsoft.WindowsTerminal" -ErrorAction SilentlyContinue)
-}
-
-function Test-VSCode {
-    return [bool](
-        (Get-Command code -ErrorAction SilentlyContinue) -or
-        (Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\Code.exe") -or
-        (Test-Path "$env:ProgramFiles\Microsoft VS Code\Code.exe")
-    )
-}
-
-function Test-DockerDesktop {
-    return [bool](
-        (Get-Command docker -ErrorAction SilentlyContinue) -or
-        (Test-Path "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe")
-    )
-}
-
-$packages = @(
-    @{ Name = "git";                        Display = "Git";              Check = { Test-Git } }
-    @{ Name = "microsoft-windows-terminal"; Display = "Windows Terminal"; Check = { Test-WindowsTerminal } }
-    @{ Name = "vscode";                     Display = "VS Code";         Check = { Test-VSCode } }
-    @{ Name = "docker-desktop";             Display = "Docker Desktop";  Check = { Test-DockerDesktop } }
-)
-
-foreach ($pkg in $packages) {
-    Write-Host "Checking $($pkg.Display)..." -NoNewline
-    if (& $pkg.Check) {
-        Add-Result $pkg.Display "Ready"
-        Write-Host " done." -ForegroundColor Green
-    } else {
-        try {
-            Write-Host " installing..." -ForegroundColor Yellow
-            Invoke-LoggedCommand "choco install $($pkg.Name) -y"
-            Refresh-Path
-
-            if ($LASTEXITCODE -ne 0) {
-                Add-Result $pkg.Display "Not Ready"
-            } else {
-                Add-Result $pkg.Display "Ready"
-            }
-        } catch {
-            Write-Log "Install error ($($pkg.Name)): $_"
-            Add-Result $pkg.Display "Not Ready"
         }
     }
 }
