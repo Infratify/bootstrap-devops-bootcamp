@@ -15,7 +15,7 @@ function Write-Log {
     Add-Content -Path $logFile -Value "[$timestamp] $Message"
 }
 
-# Runs a command and streams all output to the log file.
+# Runs a command, streams all output to the log file, and returns the exit code.
 # Uses -ErrorAction Continue so stderr from native executables (e.g. wsl.exe)
 # does not become a terminating error that skips retry logic.
 function Invoke-LoggedCommand {
@@ -24,6 +24,9 @@ function Invoke-LoggedCommand {
     $prevEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
+        # Reset first so a throw before the native binary launches cannot leave
+        # a stale exit code from an earlier command for the caller to read.
+        $global:LASTEXITCODE = 0
         $output = Invoke-Expression $Command 2>&1
         if ($output) {
             # Some native executables (e.g. wsl.exe) output UTF-16LE which leaves
@@ -36,6 +39,8 @@ function Invoke-LoggedCommand {
     } finally {
         $ErrorActionPreference = $prevEAP
     }
+    Write-Log "Exit code: $LASTEXITCODE"
+    return $LASTEXITCODE
 }
 
 # Refresh PATH helper — picks up changes from installers without restarting the shell
@@ -117,7 +122,7 @@ if (Get-Command choco -ErrorAction SilentlyContinue) {
 } else {
     try {
         Write-Host " installing..." -ForegroundColor Yellow
-        Invoke-LoggedCommand "iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
+        $null = Invoke-LoggedCommand "iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
         Refresh-Path
 
         if (Get-Command choco -ErrorAction SilentlyContinue) {
@@ -175,17 +180,21 @@ foreach ($pkg in $packages) {
     } else {
         try {
             Write-Host " installing..." -ForegroundColor Yellow
-            Invoke-LoggedCommand "choco install $($pkg.Name) -y"
+            $exit = Invoke-LoggedCommand "choco install $($pkg.Name) -y"
             Refresh-Path
 
-            if ($LASTEXITCODE -ne 0) {
-                Add-Result $pkg.Display "Not Ready"
-            } else {
+            if ($exit -eq 3010) {
+                # 3010 = success, reboot required (common for docker-desktop)
+                $rebootRequired = $true
+                Add-Result $pkg.Display "Ready" "installed; reboot required"
+            } elseif ($exit -eq 0) {
                 Add-Result $pkg.Display "Ready"
+            } else {
+                Add-Result $pkg.Display "Not Ready" "choco exit code $exit - see script.log"
             }
         } catch {
             Write-Log "Install error ($($pkg.Name)): $_"
-            Add-Result $pkg.Display "Not Ready"
+            Add-Result $pkg.Display "Not Ready" "$_"
         }
     }
 }
