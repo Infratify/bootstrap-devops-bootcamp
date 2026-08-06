@@ -5,6 +5,15 @@
 
 $ErrorActionPreference = "Stop"
 
+# script.bat normally elevates; guard against running script.ps1 directly.
+$identity = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not $identity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "This script must run as Administrator." -ForegroundColor Red
+    Write-Host "Double-click script.bat instead - it elevates automatically." -ForegroundColor Yellow
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
 # --- Log file setup ---
 $logFile = Join-Path $PSScriptRoot "script.log"
 Set-Content -Path $logFile -Value "Bootstrap started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
