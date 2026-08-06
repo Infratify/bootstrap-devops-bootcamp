@@ -21,9 +21,9 @@
 
     $repo = "Infratify/bootstrap-devops-bootcamp"
 
-    # >>> TEMPORARY: points at the WSL fix branch for pre-merge testing. <<<
-    # >>> REVERT THIS TO "main" BEFORE MERGING.                          <<<
-    $defaultBranch = "fix/wsl-silent-failures"
+    # Set BOOTSTRAP_BRANCH to test an unmerged branch end-to-end; the banner
+    # below makes any non-main build obvious on screen.
+    $defaultBranch = "main"
 
     $branch = if ($env:BOOTSTRAP_BRANCH) { $env:BOOTSTRAP_BRANCH } else { $defaultBranch }
     $url    = "https://raw.githubusercontent.com/$repo/$branch/script.ps1"
