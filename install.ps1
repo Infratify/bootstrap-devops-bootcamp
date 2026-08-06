@@ -19,8 +19,13 @@
     # otherwise fail to reach raw.githubusercontent.com.
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
 
-    $repo   = "Infratify/bootstrap-devops-bootcamp"
-    $branch = if ($env:BOOTSTRAP_BRANCH) { $env:BOOTSTRAP_BRANCH } else { "main" }
+    $repo = "Infratify/bootstrap-devops-bootcamp"
+
+    # >>> TEMPORARY: points at the WSL fix branch for pre-merge testing. <<<
+    # >>> REVERT THIS TO "main" BEFORE MERGING.                          <<<
+    $defaultBranch = "fix/wsl-silent-failures"
+
+    $branch = if ($env:BOOTSTRAP_BRANCH) { $env:BOOTSTRAP_BRANCH } else { $defaultBranch }
     $url    = "https://raw.githubusercontent.com/$repo/$branch/script.ps1"
 
     # GetFolderPath, not "$env:USERPROFILE\Desktop" - OneDrive redirects the
@@ -32,6 +37,13 @@
     $dest = Join-Path $dir "script.ps1"
 
     Write-Host "=== Bootcamp Environment Bootstrap ===" -ForegroundColor Cyan
+
+    # Loud on purpose: a launcher pointing anywhere but main is a testing build
+    # and must never reach students unnoticed.
+    if ($branch -ne "main") {
+        Write-Host "TESTING BUILD - pulling script.ps1 from branch '$branch', not main." -ForegroundColor Magenta
+    }
+
     Write-Host "Downloading the bootstrap script..." -NoNewline
 
     try {
