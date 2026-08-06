@@ -165,6 +165,40 @@ function Test-DockerDesktop {
     )
 }
 
+# True only when the WSL platform actually responds - not merely when wsl.exe exists.
+# Old inbox wsl.exe does not understand --version and exits non-zero.
+# ErrorActionPreference is forced to Continue because 2>&1 on a native binary
+# turns stderr into a terminating NativeCommandError under the script's
+# default "Stop" preference.
+function Test-WslWorking {
+    if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) { return $false }
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $global:LASTEXITCODE = 0
+        # wsl.exe emits UTF-16LE; strip the null bytes left behind by the capture.
+        $v = (wsl --version 2>&1 | Out-String) -replace "`0", ""
+        $exit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+    return ($exit -eq 0 -and $v -match "WSL")
+}
+
+# Lists installed distros, tolerating a broken wsl.exe. Returns "" on failure.
+function Get-WslDistros {
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $list = (wsl -l -q 2>&1 | Out-String) -replace "`0", ""
+    } catch {
+        $list = ""
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+    return $list
+}
+
 $packages = @(
     @{ Name = "git";                        Display = "Git";              Check = { Test-Git } }
     @{ Name = "microsoft-windows-terminal"; Display = "Windows Terminal"; Check = { Test-WindowsTerminal } }
