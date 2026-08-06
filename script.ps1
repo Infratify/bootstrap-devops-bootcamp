@@ -45,6 +45,12 @@ function Invoke-LoggedCommand {
                 Add-Content -Path $logFile -Value $text
             }
         }
+    } catch {
+        # Invoke-Expression can throw before the native binary ever launches
+        # (command not found, parse error). Report failure explicitly - the
+        # reset 0 above would otherwise be returned and read as success.
+        Write-Log "Command threw: $_"
+        $global:LASTEXITCODE = 1
     } finally {
         $ErrorActionPreference = $prevEAP
     }
