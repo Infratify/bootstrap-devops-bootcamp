@@ -1,4 +1,4 @@
-# This script is intended to be launched via script.bat,
+﻿# This script is intended to be launched via script.bat,
 # which handles execution policy bypass and admin elevation.
 
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
@@ -58,7 +58,7 @@ function Invoke-LoggedCommand {
     return $LASTEXITCODE
 }
 
-# Refresh PATH helper — picks up changes from installers without restarting the shell
+# Refresh PATH helper â€” picks up changes from installers without restarting the shell
 function Refresh-Path {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
     Write-Log "PATH refreshed."
@@ -353,39 +353,39 @@ try {
 }
 
 # =====================================================================
-# Ubuntu 24.04 LTS
+# Ubuntu 26.04 LTS
 # =====================================================================
-Write-Host "Checking Ubuntu 24.04 LTS..." -NoNewline
+Write-Host "Checking Ubuntu 26.04 LTS..." -NoNewline
 if (-not (Test-WslWorking)) {
     if ($rebootRequired) {
-        Add-Result "Ubuntu 24.04 LTS" "Pending Reboot" "reboot, then run this script again"
+        Add-Result "Ubuntu 26.04 LTS" "Pending Reboot" "reboot, then run this script again"
         Write-Host " pending reboot." -ForegroundColor DarkYellow
     } else {
-        Add-Result "Ubuntu 24.04 LTS" "Not Ready" "WSL is not working (see WSL Platform row)"
+        Add-Result "Ubuntu 26.04 LTS" "Not Ready" "WSL is not working (see WSL Platform row)"
         Write-Host " skipped." -ForegroundColor DarkYellow
     }
 } else {
     $distros = Get-WslDistros
-    if ($distros -match "Ubuntu-24\.04") {
-        Add-Result "Ubuntu 24.04 LTS" "Ready"
+    if ($distros -match "Ubuntu-26\.04") {
+        Add-Result "Ubuntu 26.04 LTS" "Ready"
         Write-Host " done." -ForegroundColor Green
     } else {
         Write-Host ""
-        $answer = Read-Host "Would you like to install Ubuntu 24.04 LTS on WSL? (Y/n)"
+        $answer = Read-Host "Would you like to install Ubuntu 26.04 LTS on WSL? (Y/n)"
         if ($answer -eq "" -or $answer -match "^[Yy]") {
-            Write-Host "Installing Ubuntu 24.04 LTS (you will be asked to create a UNIX user)..." -ForegroundColor Yellow
-            Write-Log "Running: wsl --install -d Ubuntu-24.04"
-            wsl --install -d Ubuntu-24.04
+            Write-Host "Installing Ubuntu 26.04 LTS (you will be asked to create a UNIX user)..." -ForegroundColor Yellow
+            Write-Log "Running: wsl --install -d Ubuntu-26.04"
+            wsl --install -d Ubuntu-26.04
             # Verify by listing distros again - the exit code alone is not
             # reliable when the user aborts UNIX user creation.
             $distros = Get-WslDistros
-            if ($distros -match "Ubuntu-24\.04") {
-                Add-Result "Ubuntu 24.04 LTS" "Ready"
+            if ($distros -match "Ubuntu-26\.04") {
+                Add-Result "Ubuntu 26.04 LTS" "Ready"
             } else {
-                Add-Result "Ubuntu 24.04 LTS" "Not Ready" "install did not complete - see script.log, or run 'wsl --install -d Ubuntu-24.04' manually"
+                Add-Result "Ubuntu 26.04 LTS" "Not Ready" "install did not complete - see script.log, or run 'wsl --install -d Ubuntu-26.04' manually"
             }
         } else {
-            Add-Result "Ubuntu 24.04 LTS" "Skipped" "declined by user"
+            Add-Result "Ubuntu 26.04 LTS" "Skipped" "declined by user"
         }
     }
 }
@@ -396,7 +396,7 @@ if (-not (Test-WslWorking)) {
 function Write-Table {
     param([System.Collections.ArrayList]$Data)
 
-    # Box-drawing characters (PS 5.1 compatible — no `u{} escapes)
+    # Box-drawing characters (PS 5.1 compatible â€” no `u{} escapes)
     $TL = [char]0x250C; $TR = [char]0x2510  # top-left, top-right
     $BL = [char]0x2514; $BR = [char]0x2518  # bottom-left, bottom-right
     $H  = [string][char]0x2500; $V  = [string][char]0x2502  # horizontal, vertical
