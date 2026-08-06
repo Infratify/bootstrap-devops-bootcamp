@@ -295,49 +295,46 @@ foreach ($feature in $features) {
 Write-Host "Checking WSL Platform..." -NoNewline
 try {
     $wslFeature = Get-WindowsOptionalFeature -Online -FeatureName "Microsoft-Windows-Subsystem-Linux" -ErrorAction SilentlyContinue
-    if ($wslFeature -and $wslFeature.State -eq "Enabled") {
-        $prevEncoding = [Console]::OutputEncoding
-        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-
-        # Check if the WSL platform package is already installed and working
-        $wslPkg = Get-AppxPackage -Name "MicrosoftCorporationII.WindowsSubsystemForLinux" -ErrorAction SilentlyContinue
-        $prevEAP = $ErrorActionPreference
-        $ErrorActionPreference = "Continue"
-        $wslVersion = (wsl --version 2>&1 | Out-String) -replace "`0", ""
-        $ErrorActionPreference = $prevEAP
-        $wslWorking = $wslPkg -and ($wslVersion -match "WSL")
-
-        if ($wslWorking) {
-            Add-Result "WSL Platform" "Ready"
-            Write-Host " done." -ForegroundColor Green
+    if (-not ($wslFeature -and $wslFeature.State -eq "Enabled")) {
+        if ($rebootRequired) {
+            Add-Result "WSL Platform" "Pending Reboot" "reboot to finish enabling Windows features, then run this script again"
+            Write-Host " pending reboot." -ForegroundColor DarkYellow
         } else {
-            Write-Host " installing..." -ForegroundColor Yellow
-            Invoke-LoggedCommand "wsl --install --no-distribution"
+            Add-Result "WSL Platform" "Not Ready" "WSL Windows feature is not enabled (see WSL Feature row)"
+            Write-Host " skipped." -ForegroundColor DarkYellow
+        }
+    } elseif (Test-WslWorking) {
+        Add-Result "WSL Platform" "Ready"
+        Write-Host " done." -ForegroundColor Green
+    } else {
+        Write-Host " installing..." -ForegroundColor Yellow
+        $wslPkg = Get-AppxPackage -Name "MicrosoftCorporationII.WindowsSubsystemForLinux" -ErrorAction SilentlyContinue
+        $exit = Invoke-LoggedCommand "wsl --install --no-distribution"
 
-            if ($LASTEXITCODE -ne 0) {
-                Write-Log "wsl --install failed (exit code $LASTEXITCODE), checking for corrupted WSL package..."
-                if ($wslPkg) {
-                    Write-Log "Removing corrupted WSL package: $($wslPkg.PackageFullName)"
-                    Remove-AppxPackage -Package $wslPkg.PackageFullName -ErrorAction SilentlyContinue
-                    Write-Log "Corrupted package removed, retrying WSL install..."
-                }
-                Invoke-LoggedCommand "wsl --install --no-distribution"
+        if ($exit -ne 0) {
+            Write-Log "wsl --install failed (exit code $exit), cleaning up and retrying with --web-download..."
+            if ($wslPkg) {
+                Write-Log "Removing possibly corrupted WSL package: $($wslPkg.PackageFullName)"
+                Remove-AppxPackage -Package $wslPkg.PackageFullName -ErrorAction SilentlyContinue
             }
-
-            if ($LASTEXITCODE -ne 0) {
-                Add-Result "WSL Platform" "Not Ready"
-            } else {
-                Add-Result "WSL Platform" "Ready"
-            }
+            # --web-download bypasses the Microsoft Store, which is blocked on
+            # many school/corporate machines.
+            $exit = Invoke-LoggedCommand "wsl --install --no-distribution --web-download"
         }
 
-        [Console]::OutputEncoding = $prevEncoding
-    } else {
-        Add-Result "WSL Platform" "Not Ready"
+        if ($exit -ne 0) {
+            Add-Result "WSL Platform" "Not Ready" "wsl --install failed (exit code $exit) - see script.log"
+        } elseif (Test-WslWorking) {
+            Add-Result "WSL Platform" "Ready"
+        } else {
+            # Installed but not responding yet - normal on first install.
+            $rebootRequired = $true
+            Add-Result "WSL Platform" "Pending Reboot" "installed; reboot, then run this script again"
+        }
     }
 } catch {
     Write-Log "WSL install/update error: $_"
-    Add-Result "WSL Platform" "Not Ready"
+    Add-Result "WSL Platform" "Not Ready" "$_"
 }
 
 # =====================================================================
