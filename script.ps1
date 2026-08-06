@@ -340,11 +340,20 @@ try {
 # =====================================================================
 # Ubuntu 24.04 LTS
 # =====================================================================
-$wslReady = (Get-Command wsl -ErrorAction SilentlyContinue) -and ((wsl --status 2>&1) -notmatch "not installed|REGDB")
-if ($wslReady) {
-    $distros = (wsl -l -q 2>&1 | Out-String) -replace "`0", ""
+Write-Host "Checking Ubuntu 24.04 LTS..." -NoNewline
+if (-not (Test-WslWorking)) {
+    if ($rebootRequired) {
+        Add-Result "Ubuntu 24.04 LTS" "Pending Reboot" "reboot, then run this script again"
+        Write-Host " pending reboot." -ForegroundColor DarkYellow
+    } else {
+        Add-Result "Ubuntu 24.04 LTS" "Not Ready" "WSL is not working (see WSL Platform row)"
+        Write-Host " skipped." -ForegroundColor DarkYellow
+    }
+} else {
+    $distros = Get-WslDistros
     if ($distros -match "Ubuntu-24\.04") {
         Add-Result "Ubuntu 24.04 LTS" "Ready"
+        Write-Host " done." -ForegroundColor Green
     } else {
         Write-Host ""
         $answer = Read-Host "Would you like to install Ubuntu 24.04 LTS on WSL? (Y/n)"
@@ -352,13 +361,16 @@ if ($wslReady) {
             Write-Host "Installing Ubuntu 24.04 LTS (you will be asked to create a UNIX user)..." -ForegroundColor Yellow
             Write-Log "Running: wsl --install -d Ubuntu-24.04"
             wsl --install -d Ubuntu-24.04
-            if ($LASTEXITCODE -eq 0) {
+            # Verify by listing distros again - the exit code alone is not
+            # reliable when the user aborts UNIX user creation.
+            $distros = Get-WslDistros
+            if ($distros -match "Ubuntu-24\.04") {
                 Add-Result "Ubuntu 24.04 LTS" "Ready"
             } else {
-                Add-Result "Ubuntu 24.04 LTS" "Not Ready"
+                Add-Result "Ubuntu 24.04 LTS" "Not Ready" "install did not complete - see script.log, or run 'wsl --install -d Ubuntu-24.04' manually"
             }
         } else {
-            Add-Result "Ubuntu 24.04 LTS" "Not Ready"
+            Add-Result "Ubuntu 24.04 LTS" "Skipped" "declined by user"
         }
     }
 }
