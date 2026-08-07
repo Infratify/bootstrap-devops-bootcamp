@@ -71,6 +71,13 @@ also get **Ubuntu on WSL**, so you have a Linux shell like everyone else.
    running. After rebooting, run the same command again. It carries on where
    it stopped.
 
+8. **Open your Linux shell.** Start **Windows Terminal** from the Start menu.
+   Click the small arrow next to the `+` tab button and pick **Ubuntu-26.04**.
+
+   > [!TIP]
+   > That entry appears on its own. You don't have to set anything up. It logs
+   > you straight in as the Ubuntu user you created in step 6.
+
 The script and its `script.log` land in `Desktop\bootcamp\`.
 
 > [!TIP]
