@@ -534,43 +534,43 @@ try {
 }
 
 # =====================================================================
-# Ubuntu 24.04 LTS
+# Ubuntu 26.04 LTS
 # =====================================================================
-Write-Host "Checking Ubuntu 24.04 LTS..." -NoNewline
+Write-Host "Checking Ubuntu 26.04 LTS..." -NoNewline
 if (-not (Test-WslWorking)) {
     if ($rebootRequired) {
-        Add-Result "Ubuntu 24.04 LTS" "Pending Reboot" "reboot, then run this script again"
+        Add-Result "Ubuntu 26.04 LTS" "Pending Reboot" "reboot, then run this script again"
         Write-Host " pending reboot." -ForegroundColor DarkYellow
     } else {
-        Add-Result "Ubuntu 24.04 LTS" "Not Ready" "WSL is not working (see WSL Platform row)"
+        Add-Result "Ubuntu 26.04 LTS" "Not Ready" "WSL is not working (see WSL Platform row)"
         Write-Host " skipped." -ForegroundColor DarkYellow
     }
 } else {
     $distros = Get-WslDistros
-    $installed = ($distros -match "Ubuntu-24\.04")
+    $installed = ($distros -match "Ubuntu-26\.04")
     $continue = $true
 
     if (-not $installed) {
         Write-Host ""
-        $answer = Read-Host "Would you like to install Ubuntu 24.04 LTS on WSL? (Y/n)"
+        $answer = Read-Host "Would you like to install Ubuntu 26.04 LTS on WSL? (Y/n)"
         if ($answer -eq "" -or $answer -match "^[Yy]") {
-            Write-Host "Installing Ubuntu 24.04 LTS. This usually takes 2-5 minutes." -ForegroundColor Yellow
+            Write-Host "Installing Ubuntu 26.04 LTS. This usually takes 2-5 minutes." -ForegroundColor Yellow
             # --no-launch keeps account setup in this window. Without it wsl.exe
             # opens a separate console for the first-run prompts and blocks here
             # until that console is closed - and closing it rather than typing
             # `exit` ends the run before any summary row is written.
-            $exit = Invoke-WithSpinner "wsl" @("--install", "-d", "Ubuntu-24.04", "--no-launch") "Downloading and installing Ubuntu 24.04 LTS"
+            $exit = Invoke-WithSpinner "wsl" @("--install", "-d", "Ubuntu-26.04", "--no-launch") "Downloading and installing Ubuntu 26.04 LTS"
             # Verify by listing distros again - the exit code alone is not
             # reliable across wsl.exe versions.
             $distros = Get-WslDistros
-            $installed = ($distros -match "Ubuntu-24\.04")
+            $installed = ($distros -match "Ubuntu-26\.04")
             if (-not $installed) {
-                Add-Result "Ubuntu 24.04 LTS" "Not Ready" "install did not complete (exit code $exit) - see script.log, or run 'wsl --install -d Ubuntu-24.04' manually"
+                Add-Result "Ubuntu 26.04 LTS" "Not Ready" "install did not complete (exit code $exit) - see script.log, or run 'wsl --install -d Ubuntu-26.04' manually"
                 Write-Host " failed." -ForegroundColor Red
                 $continue = $false
             }
         } else {
-            Add-Result "Ubuntu 24.04 LTS" "Skipped" "declined by user"
+            Add-Result "Ubuntu 26.04 LTS" "Skipped" "declined by user"
             Write-Host " skipped." -ForegroundColor DarkYellow
             $continue = $false
         }
@@ -580,24 +580,24 @@ if (-not (Test-WslWorking)) {
         # Registered but still starting as root means account setup never ran:
         # either the --no-launch install just above, or an earlier run that was
         # interrupted partway. Both are finished off here.
-        $defaultUser = Get-WslDefaultUser "Ubuntu-24.04"
+        $defaultUser = Get-WslDefaultUser "Ubuntu-26.04"
         if ($defaultUser -and $defaultUser -ne "root") {
-            Add-Result "Ubuntu 24.04 LTS" "Ready"
+            Add-Result "Ubuntu 26.04 LTS" "Ready"
             Write-Host " done." -ForegroundColor Green
         } else {
             Write-Host ""
             Write-Host "Setting up your Ubuntu account - answer here, no separate window opens." -ForegroundColor Yellow
-            if (Initialize-WslUser "Ubuntu-24.04") {
-                $defaultUser = Get-WslDefaultUser "Ubuntu-24.04"
+            if (Initialize-WslUser "Ubuntu-26.04") {
+                $defaultUser = Get-WslDefaultUser "Ubuntu-26.04"
                 if ($defaultUser -and $defaultUser -ne "root") {
-                    Add-Result "Ubuntu 24.04 LTS" "Ready"
-                    Write-Host "Ubuntu 24.04 LTS is ready as '$defaultUser'." -ForegroundColor Green
+                    Add-Result "Ubuntu 26.04 LTS" "Ready"
+                    Write-Host "Ubuntu 26.04 LTS is ready as '$defaultUser'." -ForegroundColor Green
                 } else {
-                    Add-Result "Ubuntu 24.04 LTS" "Not Ready" "account created but Ubuntu still starts as root - see script.log"
-                    Write-Host "Ubuntu 24.04 LTS still starts as root." -ForegroundColor Red
+                    Add-Result "Ubuntu 26.04 LTS" "Not Ready" "account created but Ubuntu still starts as root - see script.log"
+                    Write-Host "Ubuntu 26.04 LTS still starts as root." -ForegroundColor Red
                 }
             } else {
-                Add-Result "Ubuntu 24.04 LTS" "Not Ready" "installed, but UNIX account setup failed - see script.log, or run 'wsl -d Ubuntu-24.04' to finish it manually"
+                Add-Result "Ubuntu 26.04 LTS" "Not Ready" "installed, but UNIX account setup failed - see script.log, or run 'wsl -d Ubuntu-26.04' to finish it manually"
                 Write-Host "Ubuntu account setup failed." -ForegroundColor Red
             }
         }

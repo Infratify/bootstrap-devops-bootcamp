@@ -58,7 +58,7 @@ also get **Ubuntu on WSL**, so you have a Linux shell like everyone else.
 4. **Wait.** Installing takes a few minutes. You'll see a spinner with a timer,
    so you know it's still working.
 
-5. **Press Y** when it offers to install Ubuntu 24.04 LTS.
+5. **Press Y** when it offers to install Ubuntu 26.04 LTS.
 
 6. **Pick a username and password** for Ubuntu.
 
@@ -79,7 +79,7 @@ The script and its `script.log` land in `Desktop\bootcamp\`.
 > extract it, and double-click **`script.bat`**. Same result.
 
 **You get:** Chocolatey · WSL · Virtual Machine Platform · Hyper-V · Containers ·
-Ubuntu 24.04 LTS · Git · Windows Terminal · VS Code · Docker Desktop.
+Ubuntu 26.04 LTS · Git · Windows Terminal · VS Code · Docker Desktop.
 
 > [!IMPORTANT]
 > Hyper-V and Containers need **Windows Pro, Enterprise, or Education**.
@@ -180,7 +180,7 @@ Docker Compose version v2.32.4
 On Windows, check Ubuntu too:
 
 ```powershell
-wsl -d Ubuntu-24.04 -- whoami
+wsl -d Ubuntu-26.04 -- whoami
 ```
 
 It should print the username you chose, not `root`.
