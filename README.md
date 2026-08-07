@@ -1,37 +1,32 @@
 # DevOps Bootcamp Bootstrap
 
-> One command. One coffee. A complete dev environment ready for the bootcamp.
+> One command. One coffee. A dev environment ready for the bootcamp.
 
-A setup script for **DevOps Bootcamp students** to prepare their desktop
-environment in a single command. It installs **Git** for version control,
-**VS Code** for writing code, **Docker** for running containerised tools
-and labs, and a **Linux/Ubuntu shell** on every platform — so your machine
-matches what the rest of the class is using on day one.
+Sets up your machine for the **DevOps Bootcamp** in a single command.
 
-| Platform | Script | Under the hood |
+You get **Git**, **VS Code**, and **Docker** on every platform. On Windows you
+also get **Ubuntu on WSL**, so you have a Linux shell like everyone else.
+
+| Platform | Command | Under the hood |
 |---|---|---|
-| **Windows** | `script.bat` | PowerShell + Chocolatey |
-| **macOS** | `script-macos.sh` | Bash + Homebrew (Apple Silicon and Intel) |
-| **Linux Desktop** | `script-linux.sh` | Bash + apt/dnf (Ubuntu, Debian, Fedora, RHEL, Rocky, AlmaLinux) |
+| **Windows** | `install.ps1` | PowerShell + Chocolatey |
+| **macOS** | `script-macos.sh` | Bash + Homebrew |
+| **Linux Desktop** | `script-linux.sh` | Bash + apt/dnf |
 
 > [!TIP]
-> **This script is idempotent.**
+> **Safe to run twice.**
 >
-> *Idempotent* means running the script once or running it ten times
-> produces the same end result. If something fails halfway — wifi drops,
-> you reboot, you accidentally close the terminal — just run it again.
-> The script checks what's already installed, marks those as `Ready`, and
-> only touches what's missing. Nothing is reinstalled, overwritten, or
-> duplicated.
+> The script checks what you already have and only installs what's missing.
+> If it fails halfway, just run it again. Nothing gets duplicated or broken.
 
 ---
 
 ## Quick navigation
 
-- [Before you start](#before-you-start) — prerequisites at a glance
-- [Windows](#windows) · [macOS](#macos) · [Linux](#linux) — pick your OS
-- [Verify it worked](#verify-it-worked) — sanity check after install
-- [If something goes wrong](#if-something-goes-wrong) — troubleshooting
+- [Before you start](#before-you-start)
+- [Windows](#windows) · [macOS](#macos) · [Linux](#linux)
+- [Check it worked](#check-it-worked)
+- [If something goes wrong](#if-something-goes-wrong)
 
 ---
 
@@ -39,31 +34,67 @@ matches what the rest of the class is using on day one.
 
 | What you need | Detail |
 |---|---|
-| **Time** | 15–45 minutes (mostly waiting for downloads) |
-| **Free disk space** | ~6 GB (Docker is the largest piece) |
-| **Internet** | Stable connection — about 2 GB of downloads |
-| **Permission** | You'll be asked for your password — UAC on Windows, `sudo` on Mac/Linux |
-
-> [!NOTE]
-> Windows uses a ZIP download because `script.bat` must be double-clicked.
-> macOS and Linux pipe `curl` straight into the terminal — same end result,
-> different delivery method.
+| **Time** | 15–45 minutes. Mostly downloading. |
+| **Disk space** | ~6 GB. Docker is the big one. |
+| **Internet** | Stable. About 2 GB of downloads. |
+| **Your password** | UAC on Windows. `sudo` on Mac and Linux. |
 
 ---
 
 ## Windows
 
-1. **Download** the [project ZIP](https://github.com/Infratify/bootstrap-devops-bootcamp/archive/refs/heads/main.zip) and extract it onto your Desktop.
-2. **Double-click `script.bat`.** Click **Yes** on the User Account Control prompt.
-3. **Wait for it to finish.** If it asks you to **reboot**, that's because Windows can't enable WSL or Hyper-V while it's running. Reboot, then double-click `script.bat` again — the script picks up where it left off.
-4. When it asks **"Would you like to install Ubuntu 24.04 LTS on WSL?"**, press **Y** — that's your Linux shell.
+1. **Open PowerShell.** Press `Win`, type `PowerShell`, hit Enter. You don't
+   need to run it as Administrator. The script asks for that itself.
 
-**What gets installed:** Chocolatey · WSL · Virtual Machine Platform · Hyper-V · Containers · Ubuntu 24.04 LTS · Git · Windows Terminal · VS Code · Docker Desktop.
+2. **Paste this and press Enter:**
+
+   ```powershell
+   irm https://raw.githubusercontent.com/Infratify/bootstrap-devops-bootcamp/main/install.ps1 | iex
+   ```
+
+3. **Click Yes** on the User Account Control prompt. A **new window** opens.
+   Watch that one from now on.
+
+4. **Press Y** when it offers to install Ubuntu 26.04 LTS.
+
+5. **Wait.** A spinner with a timer appears while Ubuntu downloads. It takes a
+   few minutes. Leave the window open.
+
+6. **Pick a username and password** for Ubuntu.
+
+   > [!NOTE]
+   > This is a **new** username and password, just for Ubuntu. It is not your
+   > Windows login. Nothing appears on screen as you type the password. That's
+   > normal.
+
+7. **Reboot if it asks.** Windows can't switch on WSL or Hyper-V while it's
+   running. After rebooting, run the same command again. It carries on where
+   it stopped.
+
+8. **Open Docker Desktop once.** It needs one manual launch to finish setting
+   itself up.
+
+9. **Open your Linux shell.** Start **Windows Terminal** from the Start menu.
+   Click the small arrow next to the `+` tab button and pick **Ubuntu-26.04**.
+
+   > [!TIP]
+   > That entry appears on its own. You don't have to set anything up. It logs
+   > you straight in as the Ubuntu user you created in step 6.
+
+The script and its `script.log` land in `Desktop\bootcamp\`.
+
+> [!TIP]
+> **Prefer clicking to typing?** Download the
+> [project ZIP](https://github.com/Infratify/bootstrap-devops-bootcamp/archive/refs/heads/main.zip),
+> extract it, and double-click **`script.bat`**. Same result.
+
+**You get:** Chocolatey · WSL · Virtual Machine Platform · Hyper-V · Containers ·
+Ubuntu 26.04 LTS · Git · Windows Terminal · VS Code · Docker Desktop.
 
 > [!IMPORTANT]
-> Hyper-V and Containers require **Windows Pro / Enterprise / Education**.
-> On **Windows Home** those show as `Not Supported` — that's fine, WSL +
-> Docker Desktop alone are enough for the bootcamp.
+> Hyper-V and Containers need **Windows Pro, Enterprise, or Education**.
+> On **Windows Home** they show as `Not Supported`. That's expected and fine.
+> WSL and Docker Desktop are all the bootcamp needs.
 
 ![Bootstrap run on Windows](screenshot-windows.png)
 
@@ -71,21 +102,31 @@ matches what the rest of the class is using on day one.
 
 ## macOS
 
-1. **Open Terminal** — press `⌘` + `Space`, type `Terminal`, hit Enter.
-2. **Paste this command and press Enter:**
+1. **Open Terminal.** Press `⌘` + `Space`, type `Terminal`, hit Enter.
+
+2. **Paste this and press Enter:**
 
    ```bash
    curl -fsSL https://raw.githubusercontent.com/Infratify/bootstrap-devops-bootcamp/main/script-macos.sh -o script-macos.sh && bash script-macos.sh
    ```
 
-3. **Approve any prompts.** A system dialog will appear to install Xcode Command Line Tools — click **Install**. The script may also ask for your Mac password.
-4. After it finishes, **open Docker Desktop once** (`⌘` + `Space` → Docker) so it can complete its first-run setup.
+3. **Answer the prompts.** The script lists what's missing. For each one it
+   asks before installing. Press Enter to accept.
 
-**What gets installed:** Xcode Command Line Tools · Homebrew · Git · VS Code · Docker Desktop.
+4. **Watch for a popup.** A macOS dialog appears for Xcode Command Line Tools.
+
+   > [!WARNING]
+   > **Click Install on that dialog.** The script waits for it to finish. If
+   > you dismiss the popup, the script keeps waiting up to 30 minutes and then
+   > gives up. If that happens, just run the script again.
+
+5. **Open Docker Desktop once** when the script is done. It needs one manual
+   launch to finish setting itself up.
+
+**You get:** Xcode Command Line Tools · Homebrew · Git · VS Code · Docker Desktop.
 
 > [!TIP]
-> [iTerm2](https://iterm2.com/) is a nicer terminal than Apple's Terminal —
-> not required for the bootcamp, but a popular optional upgrade.
+> [iTerm2](https://iterm2.com/) is a nicer terminal than Apple's. Optional.
 
 ![Bootstrap run on macOS](screenshot-macos.png)
 
@@ -93,32 +134,42 @@ matches what the rest of the class is using on day one.
 
 ## Linux
 
-Supported: **Ubuntu, Debian, Fedora, RHEL, Rocky, AlmaLinux**.
-Other distros (Arch, openSUSE, Alpine, etc.) are reported as `Not Supported`.
+Works on **Ubuntu, Debian, Fedora, RHEL, Rocky, and AlmaLinux**.
+Other distros (Arch, openSUSE, Alpine) are reported as `Not Supported`.
 
 1. **Open a terminal.**
-2. **Paste this command and press Enter:**
+
+2. **Paste this and press Enter:**
 
    ```bash
    curl -fsSL https://raw.githubusercontent.com/Infratify/bootstrap-devops-bootcamp/main/script-linux.sh -o script-linux.sh && bash script-linux.sh
    ```
 
-   The script asks for your password (`sudo`) and re-runs itself with admin rights.
-3. After Docker installs, **log out and log back in.** This lets your user pick up the `docker` group — without this, you'd need to type `sudo docker …` for every command.
+3. **Type your password.** The script needs `sudo` and restarts itself with it.
 
-**What gets installed:** Git · VS Code (Microsoft repo) · Docker Engine · Docker CLI · Docker Compose v2 · Buildx · containerd — installed from Docker's official repo (`docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`).
+4. **Answer the prompts.** The script lists what's missing. For each one it
+   asks before installing. Press Enter to accept.
+
+5. **Log out and log back in** at the end.
+
+   > [!IMPORTANT]
+   > This step matters. It lets you run `docker` without `sudo`. Skip it and
+   > every Docker command will fail with a permission error.
+
+**You get:** Git · VS Code · Docker Engine · Docker CLI · Docker Compose v2 ·
+Buildx · containerd.
 
 > [!NOTE]
-> Install steps follow Docker's official guide at
+> Docker is installed from Docker's official repository, following
 > [docs.docker.com/engine/install](https://docs.docker.com/engine/install/).
 
 ![Bootstrap run on Linux](screenshot-linux.png)
 
 ---
 
-## Verify it worked
+## Check it worked
 
-**Open a fresh terminal** (close the current one and open a new one), then run:
+**Open a new terminal**, then run:
 
 ```bash
 git --version
@@ -127,7 +178,7 @@ docker --version
 docker compose version
 ```
 
-Each command should print a version number, similar to:
+Each should print a version number:
 
 ```
 git version 2.45.1
@@ -136,20 +187,32 @@ Docker version 27.5.1, build ...
 Docker Compose version v2.32.4
 ```
 
+On Windows, check Ubuntu too:
+
+```powershell
+wsl -d Ubuntu-26.04 -- whoami
+```
+
+It should print the username you chose, not `root`.
+
 > [!WARNING]
-> If any command says **`command not found`**:
+> Seeing **`command not found`**?
 >
-> - Close every terminal window and open a new one — PATH changes only apply to new sessions.
-> - On Linux, **log out and back in.**
-> - Re-run the bootstrap script. Because it's idempotent, it only installs what's missing.
+> - Close every terminal window and open a new one. PATH changes only apply to
+>   new terminals.
+> - On Linux, log out and back in.
+> - Run the script again. It only fixes what's broken.
 
 ---
 
 ## If something goes wrong
 
-1. **Read `script.log`** — it sits next to the script itself and captures every command with its output. The actual error is almost always at the bottom.
-2. **Re-run the script.** It's idempotent — running it again only fixes the broken pieces, it never breaks the working ones.
-3. **Still stuck?** Open an [issue on this repo](https://github.com/Infratify/bootstrap-devops-bootcamp/issues) with `script.log` attached.
+1. **Read `script.log`.** It sits next to the script. The error is almost
+   always at the bottom.
+2. **Run the script again.** It only installs what's missing.
+3. **Still stuck?** Open an
+   [issue](https://github.com/Infratify/bootstrap-devops-bootcamp/issues) and
+   attach `script.log`.
 
 ---
 
