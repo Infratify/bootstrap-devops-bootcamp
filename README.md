@@ -10,7 +10,7 @@ matches what the rest of the class is using on day one.
 
 | Platform | Script | Under the hood |
 |---|---|---|
-| **Windows** | `script.bat` | PowerShell + Chocolatey |
+| **Windows** | `install.ps1` | PowerShell + Chocolatey |
 | **macOS** | `script-macos.sh` | Bash + Homebrew (Apple Silicon and Intel) |
 | **Linux Desktop** | `script-linux.sh` | Bash + apt/dnf (Ubuntu, Debian, Fedora, RHEL, Rocky, AlmaLinux) |
 
@@ -44,19 +44,27 @@ matches what the rest of the class is using on day one.
 | **Internet** | Stable connection — about 2 GB of downloads |
 | **Permission** | You'll be asked for your password — UAC on Windows, `sudo` on Mac/Linux |
 
-> [!NOTE]
-> Windows uses a ZIP download because `script.bat` must be double-clicked.
-> macOS and Linux pipe `curl` straight into the terminal — same end result,
-> different delivery method.
-
 ---
 
 ## Windows
 
-1. **Download** the [project ZIP](https://github.com/Infratify/bootstrap-devops-bootcamp/archive/refs/heads/main.zip) and extract it onto your Desktop.
-2. **Double-click `script.bat`.** Click **Yes** on the User Account Control prompt.
-3. **Wait for it to finish.** If it asks you to **reboot**, that's because Windows can't enable WSL or Hyper-V while it's running. Reboot, then double-click `script.bat` again — the script picks up where it left off.
-4. When it asks **"Would you like to install Ubuntu 24.04 LTS on WSL?"**, press **Y** — that's your Linux shell.
+1. **Open PowerShell** — press `Win`, type `PowerShell`, hit Enter. (No need to run it as Administrator; the script asks for that itself.)
+2. **Paste this command and press Enter:**
+
+   ```powershell
+   irm https://raw.githubusercontent.com/Infratify/bootstrap-devops-bootcamp/main/install.ps1 | iex
+   ```
+
+3. **Click Yes** on the User Account Control prompt. The bootstrap opens in a **new window** — watch that one from here on.
+4. **Wait for it to finish.** If it asks you to **reboot**, that's because Windows can't enable WSL or Hyper-V while it's running. Reboot, then run the same command again — the script picks up where it left off.
+5. When it asks **"Would you like to install Ubuntu 24.04 LTS on WSL?"**, press **Y** — that's your Linux shell.
+
+The script lands in `Desktop\bootcamp\`, alongside its `script.log`.
+
+> [!TIP]
+> **Prefer clicking to typing?** Download the
+> [project ZIP](https://github.com/Infratify/bootstrap-devops-bootcamp/archive/refs/heads/main.zip),
+> extract it, and double-click **`script.bat`** instead. Same result.
 
 **What gets installed:** Chocolatey · WSL · Virtual Machine Platform · Hyper-V · Containers · Ubuntu 24.04 LTS · Git · Windows Terminal · VS Code · Docker Desktop.
 
