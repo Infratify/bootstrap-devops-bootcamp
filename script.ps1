@@ -58,6 +58,74 @@ function Invoke-LoggedCommand {
     return $LASTEXITCODE
 }
 
+# Runs a native command while showing a spinner and an elapsed-time counter,
+# then streams its output to the log and returns the exit code.
+#
+# Long installs capture their output to the log, which means the console sits
+# completely silent for minutes - beginners read that as a freeze and kill the
+# window. Start-Process gives a handle to poll so the foreground can animate
+# while the install runs.
+function Invoke-WithSpinner {
+    param(
+        [string]$FilePath,
+        [string[]]$ArgumentList,
+        [string]$Message
+    )
+
+    $outFile = [System.IO.Path]::GetTempFileName()
+    $errFile = [System.IO.Path]::GetTempFileName()
+    $frames = @("|", "/", "-", "\")
+    $exit = 1
+
+    Write-Log "Running: $FilePath $($ArgumentList -join ' ')"
+    try {
+        $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList `
+            -NoNewWindow -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        # Touching .Handle makes the Process object cache the OS handle. Without
+        # it .ExitCode reads back empty once the process has gone, which would
+        # report a successful install as a failure with a blank exit code.
+        $null = $proc.Handle
+        $started = Get-Date
+        $i = 0
+        while (-not $proc.HasExited) {
+            $secs = [int]((Get-Date) - $started).TotalSeconds
+            $mins = [int]($secs / 60)
+            if ($mins -ge 1) {
+                $clock = "{0}m {1:d2}s" -f $mins, ($secs % 60)
+            } else {
+                $clock = "{0}s" -f $secs
+            }
+            Write-Host ("`r  {0} {1} ({2}) " -f $frames[$i % 4], $Message, $clock) -NoNewline -ForegroundColor Yellow
+            $i++
+            Start-Sleep -Milliseconds 150
+        }
+        $proc.WaitForExit()
+        $exit = $proc.ExitCode
+        if ($null -eq $exit) {
+            Write-Log "Could not read exit code from $FilePath - treating as failure."
+            $exit = 1
+        }
+        # Wipe the spinner line so the next Write-Host starts clean.
+        Write-Host ("`r" + (" " * 70) + "`r") -NoNewline
+    } catch {
+        Write-Host ("`r" + (" " * 70) + "`r") -NoNewline
+        Write-Log "Command threw: $_"
+        $exit = 1
+    } finally {
+        foreach ($capture in @($outFile, $errFile)) {
+            if (Test-Path $capture) {
+                # Same UTF-16LE null-stripping as everywhere else wsl.exe is captured.
+                $text = (Get-Content $capture -Raw -ErrorAction SilentlyContinue) -replace "`0", ""
+                if ($text -and $text.Trim()) { Add-Content -Path $logFile -Value $text.Trim() }
+                Remove-Item $capture -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    Write-Log "Exit code: $exit"
+    return $exit
+}
+
 # Refresh PATH helper — picks up changes from installers without restarting the shell
 function Refresh-Path {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
@@ -214,6 +282,119 @@ function Get-WslDistros {
     return $list
 }
 
+# Returns the distro's default UNIX user, or "" if it cannot be determined.
+# A distro registered with --no-launch has no account yet and answers "root".
+function Get-WslDefaultUser {
+    param([string]$Distro)
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $global:LASTEXITCODE = 0
+        $who = (wsl -d $Distro -- whoami 2>&1 | Out-String) -replace "`0", ""
+        if ($LASTEXITCODE -ne 0) { $who = "" }
+    } catch {
+        $who = ""
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+    return $who.Trim()
+}
+
+# Creates the UNIX account inside a registered distro and makes it the default,
+# prompting in this console. This is what `wsl --install -d` does on its own,
+# except it hands the prompts to a separate window and blocks this script until
+# that window is closed - and closing it rather than typing `exit` kills the run
+# before any summary row is written. Returns $true on success.
+function Initialize-WslUser {
+    param([string]$Distro)
+
+    $suggested = ($env:USERNAME -replace "[^A-Za-z0-9_-]", "").ToLower()
+    if ($suggested -notmatch "^[a-z_]") { $suggested = "dev$suggested" }
+    if ($suggested.Length -gt 32) { $suggested = $suggested.Substring(0, 32) }
+
+    $unixUser = ""
+    while (-not $unixUser) {
+        $entered = Read-Host "UNIX username (press Enter for '$suggested')"
+        if (-not $entered) { $entered = $suggested }
+        $entered = $entered.Trim()
+        if ($entered -cmatch "^[a-z_][a-z0-9_-]{0,31}$") {
+            $unixUser = $entered
+        } else {
+            Write-Host "  Must start with a lowercase letter or _, then lowercase letters, digits, - or _ (max 32)." -ForegroundColor Yellow
+        }
+    }
+
+    $plain = ""
+    while (-not $plain) {
+        $secure1 = Read-Host "Password for '$unixUser'" -AsSecureString
+        $secure2 = Read-Host "Confirm password" -AsSecureString
+        $bstr1 = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure1)
+        $bstr2 = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure2)
+        try {
+            $try1 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr1)
+            $try2 = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr2)
+            if (-not $try1) {
+                Write-Host "  Password cannot be empty." -ForegroundColor Yellow
+            } elseif ($try1 -cne $try2) {
+                Write-Host "  Passwords do not match." -ForegroundColor Yellow
+            } else {
+                $plain = $try1
+            }
+        } finally {
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr1)
+            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr2)
+        }
+    }
+
+    $ok = $false
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        # An existing account means a previous run got partway; carry on and
+        # reset its password rather than failing the whole section.
+        $global:LASTEXITCODE = 0
+        wsl -d $Distro -u root -- id -u $unixUser 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Creating UNIX user '$unixUser' in $Distro"
+            $out = (wsl -d $Distro -u root -- useradd -m -s /bin/bash -G sudo $unixUser 2>&1 | Out-String) -replace "`0", ""
+            if ($out.Trim()) { Write-Log $out.Trim() }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "useradd failed (exit code $LASTEXITCODE)"
+                return $false
+            }
+        } else {
+            Write-Log "UNIX user '$unixUser' already exists in $Distro; resetting password."
+        }
+
+        # Piped over stdin so the password never lands on a command line, in the
+        # process list, or in this log.
+        $global:LASTEXITCODE = 0
+        "${unixUser}:${plain}" | wsl -d $Distro -u root -- chpasswd 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "chpasswd failed (exit code $LASTEXITCODE)"
+            return $false
+        }
+
+        $global:LASTEXITCODE = 0
+        $out = (wsl --manage $Distro --set-default-user $unixUser 2>&1 | Out-String) -replace "`0", ""
+        if ($out.Trim()) { Write-Log $out.Trim() }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "--set-default-user failed (exit code $LASTEXITCODE)"
+            return $false
+        }
+        $ok = $true
+    } catch {
+        Write-Log "UNIX user setup error: $_"
+        $ok = $false
+    } finally {
+        $plain = $null
+        $ErrorActionPreference = $prevEAP
+    }
+
+    if ($ok) { Write-Log "UNIX user '$unixUser' created and set as default for $Distro." }
+    return $ok
+}
+
 $packages = @(
     @{ Name = "git";                        Display = "Git";              Check = { Test-Git } }
     @{ Name = "microsoft-windows-terminal"; Display = "Windows Terminal"; Check = { Test-WindowsTerminal } }
@@ -366,26 +547,59 @@ if (-not (Test-WslWorking)) {
     }
 } else {
     $distros = Get-WslDistros
-    if ($distros -match "Ubuntu-24\.04") {
-        Add-Result "Ubuntu 24.04 LTS" "Ready"
-        Write-Host " done." -ForegroundColor Green
-    } else {
+    $installed = ($distros -match "Ubuntu-24\.04")
+    $continue = $true
+
+    if (-not $installed) {
         Write-Host ""
         $answer = Read-Host "Would you like to install Ubuntu 24.04 LTS on WSL? (Y/n)"
         if ($answer -eq "" -or $answer -match "^[Yy]") {
-            Write-Host "Installing Ubuntu 24.04 LTS (you will be asked to create a UNIX user)..." -ForegroundColor Yellow
-            Write-Log "Running: wsl --install -d Ubuntu-24.04"
-            wsl --install -d Ubuntu-24.04
+            Write-Host "Installing Ubuntu 24.04 LTS. This usually takes 2-5 minutes." -ForegroundColor Yellow
+            # --no-launch keeps account setup in this window. Without it wsl.exe
+            # opens a separate console for the first-run prompts and blocks here
+            # until that console is closed - and closing it rather than typing
+            # `exit` ends the run before any summary row is written.
+            $exit = Invoke-WithSpinner "wsl" @("--install", "-d", "Ubuntu-24.04", "--no-launch") "Downloading and installing Ubuntu 24.04 LTS"
             # Verify by listing distros again - the exit code alone is not
-            # reliable when the user aborts UNIX user creation.
+            # reliable across wsl.exe versions.
             $distros = Get-WslDistros
-            if ($distros -match "Ubuntu-24\.04") {
-                Add-Result "Ubuntu 24.04 LTS" "Ready"
-            } else {
-                Add-Result "Ubuntu 24.04 LTS" "Not Ready" "install did not complete - see script.log, or run 'wsl --install -d Ubuntu-24.04' manually"
+            $installed = ($distros -match "Ubuntu-24\.04")
+            if (-not $installed) {
+                Add-Result "Ubuntu 24.04 LTS" "Not Ready" "install did not complete (exit code $exit) - see script.log, or run 'wsl --install -d Ubuntu-24.04' manually"
+                Write-Host " failed." -ForegroundColor Red
+                $continue = $false
             }
         } else {
             Add-Result "Ubuntu 24.04 LTS" "Skipped" "declined by user"
+            Write-Host " skipped." -ForegroundColor DarkYellow
+            $continue = $false
+        }
+    }
+
+    if ($continue) {
+        # Registered but still starting as root means account setup never ran:
+        # either the --no-launch install just above, or an earlier run that was
+        # interrupted partway. Both are finished off here.
+        $defaultUser = Get-WslDefaultUser "Ubuntu-24.04"
+        if ($defaultUser -and $defaultUser -ne "root") {
+            Add-Result "Ubuntu 24.04 LTS" "Ready"
+            Write-Host " done." -ForegroundColor Green
+        } else {
+            Write-Host ""
+            Write-Host "Setting up your Ubuntu account - answer here, no separate window opens." -ForegroundColor Yellow
+            if (Initialize-WslUser "Ubuntu-24.04") {
+                $defaultUser = Get-WslDefaultUser "Ubuntu-24.04"
+                if ($defaultUser -and $defaultUser -ne "root") {
+                    Add-Result "Ubuntu 24.04 LTS" "Ready"
+                    Write-Host "Ubuntu 24.04 LTS is ready as '$defaultUser'." -ForegroundColor Green
+                } else {
+                    Add-Result "Ubuntu 24.04 LTS" "Not Ready" "account created but Ubuntu still starts as root - see script.log"
+                    Write-Host "Ubuntu 24.04 LTS still starts as root." -ForegroundColor Red
+                }
+            } else {
+                Add-Result "Ubuntu 24.04 LTS" "Not Ready" "installed, but UNIX account setup failed - see script.log, or run 'wsl -d Ubuntu-24.04' to finish it manually"
+                Write-Host "Ubuntu account setup failed." -ForegroundColor Red
+            }
         }
     }
 }
