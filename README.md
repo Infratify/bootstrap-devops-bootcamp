@@ -55,10 +55,10 @@ also get **Ubuntu on WSL**, so you have a Linux shell like everyone else.
 3. **Click Yes** on the User Account Control prompt. A **new window** opens.
    Watch that one from now on.
 
-4. **Wait.** Installing takes a few minutes. You'll see a spinner with a timer,
-   so you know it's still working.
+4. **Press Y** when it offers to install Ubuntu 26.04 LTS.
 
-5. **Press Y** when it offers to install Ubuntu 26.04 LTS.
+5. **Wait.** A spinner with a timer appears while Ubuntu downloads. It takes a
+   few minutes. Leave the window open.
 
 6. **Pick a username and password** for Ubuntu.
 
@@ -71,7 +71,10 @@ also get **Ubuntu on WSL**, so you have a Linux shell like everyone else.
    running. After rebooting, run the same command again. It carries on where
    it stopped.
 
-8. **Open your Linux shell.** Start **Windows Terminal** from the Start menu.
+8. **Open Docker Desktop once.** It needs one manual launch to finish setting
+   itself up.
+
+9. **Open your Linux shell.** Start **Windows Terminal** from the Start menu.
    Click the small arrow next to the `+` tab button and pick **Ubuntu-26.04**.
 
    > [!TIP]
